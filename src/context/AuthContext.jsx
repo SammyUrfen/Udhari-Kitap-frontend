@@ -33,11 +33,23 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = async (email, password) => {
-    const response = await authService.login(email, password)
-    setUser(response.user)
-    localStorage.setItem('token', response.token)
-    localStorage.setItem('user', JSON.stringify(response.user))
-    return response
+    try {
+      // Clear any existing stale data first
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      
+      const response = await authService.login(email, password)
+      setUser(response.user)
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('user', JSON.stringify(response.user))
+      return response
+    } catch (error) {
+      // Make sure to clear on error too
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      setUser(null)
+      throw error
+    }
   }
 
   const register = async (name, email, password) => {
