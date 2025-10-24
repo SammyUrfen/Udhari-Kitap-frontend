@@ -34,17 +34,17 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Clear any existing stale data first
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      
       const response = await authService.login(email, password)
+      
+      // Atomically update both user state and localStorage
+      // This prevents any intermediate state that could trigger reloads
       setUser(response.user)
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
+      
       return response
     } catch (error) {
-      // Make sure to clear on error too
+      // Only clear on error
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       setUser(null)

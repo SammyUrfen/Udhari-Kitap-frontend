@@ -45,6 +45,10 @@ const Expenses = () => {
   const [filterFriend, setFilterFriend] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [expandedExpense, setExpandedExpense] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMoreExpenses, setHasMoreExpenses] = useState(true)
+  const [expensesPage, setExpensesPage] = useState(1)
+  const EXPENSES_PER_PAGE = 50
 
   // Get current user ID (could be _id or id)
   const currentUserId = user?._id || user?.id
@@ -93,25 +97,64 @@ const Expenses = () => {
     fetchData()
   }, [filterFriend, showDeleted])
 
-  const fetchData = async () => {
+  const fetchData = async (reset = true) => {
     try {
-      setLoading(true)
+      setLoading(reset)
       
       // Fetch friends list
       const friendsData = await friendsService.getFriends()
       const friendsList = friendsData.friends || []
       setFriends(friendsList)
 
-      // Fetch all expenses (backend doesn't support friend filtering)
-      const params = {}
+      // Fetch expenses with pagination
+      const params = {
+        limit: EXPENSES_PER_PAGE,
+        page: reset ? 1 : expensesPage
+      }
       if (showDeleted) params.includeDeleted = true
 
       const expensesData = await expensesService.getExpenses(params)
-      setExpenses(expensesData.expenses || [])
+      
+      if (reset) {
+        setExpenses(expensesData.expenses || [])
+        setExpensesPage(1)
+      } else {
+        setExpenses(prev => [...prev, ...(expensesData.expenses || [])])
+      }
+      
+      setHasMoreExpenses(expensesData.hasMore || false)
     } catch (error) {
       toast.error('Failed to load expenses')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMoreExpenses = async () => {
+    try {
+      setLoadingMore(true)
+      const nextPage = expensesPage + 1
+      
+      const params = {
+        limit: EXPENSES_PER_PAGE,
+        page: nextPage
+      }
+      if (showDeleted) params.includeDeleted = true
+
+      const expensesData = await expensesService.getExpenses(params)
+      const newExpenses = expensesData.expenses || []
+      
+      if (newExpenses.length > 0) {
+        setExpenses(prev => [...prev, ...newExpenses])
+        setExpensesPage(nextPage)
+        setHasMoreExpenses(expensesData.hasMore || false)
+      } else {
+        setHasMoreExpenses(false)
+      }
+    } catch (error) {
+      toast.error('Failed to load more expenses')
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -913,6 +956,19 @@ const Expenses = () => {
                 </div>
               )
             })}
+          </div>
+        )}
+        
+        {/* Load More Button */}
+        {!loading && filteredExpenses.length > 0 && hasMoreExpenses && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={loadMoreExpenses}
+              disabled={loadingMore}
+              className="px-6 py-2 bg-primary-600 dark:bg-dark-accent text-white rounded-lg hover:bg-primary-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingMore ? 'Loading...' : 'Load More Expenses'}
+            </button>
           </div>
         )}
       </div>

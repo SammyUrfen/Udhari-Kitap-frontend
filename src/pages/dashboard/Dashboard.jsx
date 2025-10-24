@@ -23,6 +23,10 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([])
   const [balances, setBalances] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMoreActivities, setLoadingMoreActivities] = useState(false)
+  const [activitiesPage, setActivitiesPage] = useState(1)
+  const [hasMoreActivities, setHasMoreActivities] = useState(true)
+  const ACTIVITIES_PER_PAGE = 5
 
   useEffect(() => {
     fetchDashboardData()
@@ -60,11 +64,14 @@ const Dashboard = () => {
       
       const netBalance = owedToYou - youOwe
 
-      // Fetch recent expenses (only 2)
-      const expensesData = await expensesService.getExpenses({ limit: 2 })
+      // Fetch recent expenses (only 3)
+      const expensesData = await expensesService.getExpenses({ limit: 3 })
       
-      // Fetch recent activities
-      const activitiesData = await activitiesService.getActivities({ limit: 5 })
+      // Fetch recent activities (first 5)
+      const activitiesData = await activitiesService.getActivities({ 
+        limit: ACTIVITIES_PER_PAGE,
+        page: 1 
+      })
 
       setStats({
         totalFriends: friendsList.length,
@@ -75,12 +82,41 @@ const Dashboard = () => {
       })
       setRecentExpenses(expensesData.expenses || [])
       setRecentActivities(activitiesData.activities || [])
+      setHasMoreActivities(activitiesData.activities?.length === ACTIVITIES_PER_PAGE)
+      setActivitiesPage(1)
       setBalances(balancesList.filter((b) => b.balance !== 0))
     } catch (error) {
       toast.error('Failed to load dashboard data')
       console.error('Dashboard error:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMoreActivities = async () => {
+    try {
+      setLoadingMoreActivities(true)
+      const nextPage = activitiesPage + 1
+      
+      const activitiesData = await activitiesService.getActivities({ 
+        limit: ACTIVITIES_PER_PAGE,
+        page: nextPage 
+      })
+
+      const newActivities = activitiesData.activities || []
+      
+      if (newActivities.length > 0) {
+        setRecentActivities(prev => [...prev, ...newActivities])
+        setActivitiesPage(nextPage)
+        setHasMoreActivities(newActivities.length === ACTIVITIES_PER_PAGE)
+      } else {
+        setHasMoreActivities(false)
+      }
+    } catch (error) {
+      toast.error('Failed to load more activities')
+      console.error('Load more activities error:', error)
+    } finally {
+      setLoadingMoreActivities(false)
     }
   }
 
@@ -322,6 +358,19 @@ const Dashboard = () => {
                 </div>
               )
             })}
+          </div>
+        )}
+        
+        {/* Load More Button */}
+        {recentActivities.length > 0 && hasMoreActivities && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={loadMoreActivities}
+              disabled={loadingMoreActivities}
+              className="px-6 py-2 bg-primary-600 dark:bg-dark-accent text-white rounded-lg hover:bg-primary-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingMoreActivities ? 'Loading...' : 'Load More'}
+            </button>
           </div>
         )}
       </div>
