@@ -86,7 +86,7 @@ const Dashboard = () => {
 
       setStats({
         totalFriends: friendsList.length,
-        totalExpenses: expensesData.count || 0,
+        totalExpenses: expensesData.total || 0,
         totalYouOwe: youOwe,
         totalOwedToYou: owedToYou,
         netBalance,
