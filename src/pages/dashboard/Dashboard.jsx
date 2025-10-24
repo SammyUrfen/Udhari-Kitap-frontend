@@ -368,8 +368,14 @@ const Dashboard = () => {
 
               // Determine if activity is clickable (expense or transaction related)
               const isClickable = activity.type?.includes('EXPENSE') || activity.type?.includes('TRANSACTION')
-              const expenseId = activity.payload?.expenseId || activity.expenseId
-              const transactionId = activity.payload?.transactionId || activity.transactionId
+              
+              // Extract IDs - they might be populated objects or just IDs
+              const expenseIdRaw = activity.payload?.expenseId || activity.expenseId
+              const transactionIdRaw = activity.payload?.transactionId || activity.transactionId
+              
+              // If they're objects (populated), extract the _id, otherwise use as is
+              const expenseId = typeof expenseIdRaw === 'object' ? (expenseIdRaw?._id || expenseIdRaw?.id) : expenseIdRaw
+              const transactionId = typeof transactionIdRaw === 'object' ? (transactionIdRaw?._id || transactionIdRaw?.id) : transactionIdRaw
 
               const handleActivityClick = () => {
                 if (!isClickable) return

@@ -72,19 +72,14 @@ const Expenses = () => {
     const friendParam = searchParams.get('friend')
     const expandParam = searchParams.get('expand')
     
-    if (friendParam) {
-      setFilterFriend(friendParam)
-    }
+    // If we have an expand param, prioritize showing that expense
     if (expandParam) {
       setExpandedExpense(expandParam)
-      
-      // Scroll to the expanded item after a short delay to ensure it's rendered
-      setTimeout(() => {
-        const element = document.getElementById(`expense-${expandParam}`)
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }, 300)
+      // Clear any friend filter to ensure the expense is visible
+      setFilterFriend('')
+    } else if (friendParam) {
+      // Only set friend filter if there's no expand param
+      setFilterFriend(friendParam)
     }
   }, [searchParams])
 
@@ -134,6 +129,7 @@ const Expenses = () => {
       
       setHasMoreExpenses(expensesData.hasMore || false)
     } catch (error) {
+      console.error('Failed to load expenses:', error)
       toast.error('Failed to load expenses')
     } finally {
       setLoading(false)
@@ -189,6 +185,19 @@ const Expenses = () => {
       }
     })
   }, [expenses, filterFriend])
+
+  // Scroll to expanded item after data loads
+  useEffect(() => {
+    if (expandedExpense && !loading && filteredExpenses.length > 0) {
+      // Wait a bit for render
+      setTimeout(() => {
+        const element = document.getElementById(`expense-${expandedExpense}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 300)
+    }
+  }, [expandedExpense, loading, expenses, filteredExpenses])
 
   // Get filtered friend info to display
   const filteredFriendInfo = useMemo(() => {
