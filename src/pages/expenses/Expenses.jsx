@@ -44,7 +44,7 @@ const Expenses = () => {
   const [editingExpense, setEditingExpense] = useState(null)
   const [filterFriend, setFilterFriend] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
-  const [showTransactions, setShowTransactions] = useState(true) // Default to showing transactions
+  const [showTransactions, setShowTransactions] = useState(false) // Default to hiding transactions
   const [expandedExpense, setExpandedExpense] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreExpenses, setHasMoreExpenses] = useState(true)
@@ -897,8 +897,15 @@ const Expenses = () => {
                         )}
                       </p>
                       
+                      {/* Show your share for expenses when not filtering by friend */}
+                      {!isTransaction && !filterFriend && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Your share: {formatCurrency(Math.abs(userShare))}
+                        </p>
+                      )}
+                      
                       {/* Show friend balance if filtering by friend */}
-                      {filterFriend && friendBalance !== null ? (
+                      {filterFriend && friendBalance !== null && (
                         <p className={`text-sm font-medium mt-1 ${
                           friendBalance > 0 
                             ? 'text-green-600 dark:text-green-400' 
@@ -909,35 +916,45 @@ const Expenses = () => {
                             : `You owe ${friendName || 'friend'}: ${formatCurrency(Math.abs(friendBalance))}`
                           }
                         </p>
-                      ) : !isTransaction ? (
-                        /* Show user's share with color coding when not filtering */
-                        <p className={`text-sm font-medium mt-1 ${
-                          userBalance > 0 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : userBalance < 0 
-                            ? 'text-red-600 dark:text-red-400' 
-                            : 'text-gray-600 dark:text-gray-400'
-                        }`}>
-                          Your share: {formatCurrency(Math.abs(userShare))}
-                          {userBalance !== 0 && (
-                            <span className="ml-2">
-                              {userBalance > 0 ? '(+' : '('}
-                              {formatCurrency(Math.abs(userBalance))})
-                            </span>
-                          )}
-                        </p>
-                      ) : null}
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-gray-900 dark:text-dark-text">
-                          {formatCurrency(expense.amountInRupees || expense.amount)}
-                        </p>
-                        {!isTransaction && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {expense.splitMethod || 'equal'} split
+                      {/* Amount section with owe/owed indicator */}
+                      <div className="text-right flex flex-col items-end">
+                        {/* For transactions: show amount in green/red based on direction */}
+                        {isTransaction ? (
+                          <p className={`text-xl font-bold ${
+                            expense.direction === 'received' 
+                              ? 'text-green-600 dark:text-green-400' 
+                              : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {expense.direction === 'received' ? '+' : '-'}
+                            {formatCurrency(expense.amountInRupees || expense.amount)}
                           </p>
+                        ) : (
+                          <>
+                            {/* For expenses: show total amount */}
+                            <p className="text-xl font-bold text-gray-900 dark:text-dark-text">
+                              {formatCurrency(expense.amountInRupees || expense.amount)}
+                            </p>
+                            
+                            {/* Show owe/owed below the total if not filtering by friend */}
+                            {!filterFriend && userBalance !== 0 ? (
+                              <p className={`text-sm font-medium ${
+                                userBalance > 0 
+                                  ? 'text-green-600 dark:text-green-400' 
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {userBalance > 0 ? 'You get ' : 'You owe '}
+                                {formatCurrency(Math.abs(userBalance))}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {expense.splitMethod || 'equal'} split
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
 
