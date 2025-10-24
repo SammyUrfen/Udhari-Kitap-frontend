@@ -2,6 +2,11 @@
 
 Frontend application for Udhari Kitab, a modern expense tracking and splitting application built with React.
 
+## 🔗 Links
+
+- **Live Demo**: [udhari-kitap.netlify.app](https://udhari-kitap.netlify.app)
+- **Backend Repository**: [github.com/SammyUrfen/Udhari-Kitap-backend](https://github.com/SammyUrfen/Udhari-Kitap-backend)
+
 ## Features
 
 - 👥 **User Authentication** - Secure login and registration
