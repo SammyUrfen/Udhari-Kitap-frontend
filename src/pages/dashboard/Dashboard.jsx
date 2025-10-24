@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useSmartPolling } from '../../hooks/useSmartPolling'
 import { friendsService } from '../../services/friends'
 import { expensesService } from '../../services/expenses'
 import { activitiesService } from '../../services/activities'
 import { formatCurrency, getBalanceText, getBalanceColor } from '../../utils/currency'
 import { formatRelativeTime } from '../../utils/date'
-import { Users, Receipt, TrendingUp, TrendingDown, Activity, DollarSign, Edit2, Trash2, RotateCcw } from 'lucide-react'
+import { Users, Receipt, TrendingUp, TrendingDown, Activity, DollarSign, Edit2, Trash2, RotateCcw, UserPlus, RefreshCw } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const Dashboard = () => {
@@ -31,6 +32,16 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardData()
   }, [])
+
+  // Smart polling - refresh data when new activity detected
+  const { lastUpdateTime, isPolling, manualRefresh } = useSmartPolling({
+    onNewActivity: (newActivity) => {
+      // Cascade refresh all dashboard data
+      fetchDashboardData()
+      toast.info('Dashboard updated with new activity', { autoClose: 2000 })
+    },
+    enabled: true // Always enabled on dashboard
+  })
 
   const fetchDashboardData = async () => {
     try {
@@ -135,10 +146,27 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Welcome Header */}
       <div className="bg-white dark:bg-dark-card rounded-lg shadow p-6 border dark:border-dark-border">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-dark-text">
-          Welcome back, {user?.name}!
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Here's your expense summary</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-dark-text">
+              Welcome back, {user?.name}!
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Here's your expense summary
+              <span className="text-xs ml-2 opacity-70">
+                • Updated {formatRelativeTime(lastUpdateTime)}
+              </span>
+            </p>
+          </div>
+          <button
+            onClick={manualRefresh}
+            disabled={isPolling}
+            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-bg rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh dashboard"
+          >
+            <RefreshCw size={20} className={isPolling ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -333,13 +361,34 @@ const Dashboard = () => {
                 if (activity.type === 'EXPENSE_UPDATED') return <Edit2 size={20} className="text-orange-500" />
                 if (activity.type === 'EXPENSE_DELETED') return <Trash2 size={20} className="text-red-500" />
                 if (activity.type === 'EXPENSE_RESTORED') return <RotateCcw size={20} className="text-purple-500" />
+                if (activity.type === 'FRIEND_ADDED_YOU') return <UserPlus size={20} className="text-teal-500" />
+                if (activity.type === 'YOU_ADDED_FRIEND') return <Users size={20} className="text-cyan-500" />
                 return <Activity size={20} className="text-gray-500" />
+              }
+
+              // Determine if activity is clickable (expense or transaction related)
+              const isClickable = activity.type?.includes('EXPENSE') || activity.type?.includes('TRANSACTION')
+              const expenseId = activity.payload?.expenseId || activity.expenseId
+              const transactionId = activity.payload?.transactionId || activity.transactionId
+
+              const handleActivityClick = () => {
+                if (!isClickable) return
+                
+                // Navigate to expenses page with the expense/transaction ID
+                if (expenseId) {
+                  navigate(`/expenses?expand=${expenseId}`)
+                } else if (transactionId) {
+                  navigate(`/expenses?expand=${transactionId}`)
+                }
               }
 
               return (
                 <div
                   key={activity._id}
-                  className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-dark-bg rounded-lg hover:bg-gray-100 dark:hover:bg-dark-card transition-colors"
+                  onClick={handleActivityClick}
+                  className={`flex items-start gap-3 p-3 bg-gray-50 dark:bg-dark-bg rounded-lg hover:bg-gray-100 dark:hover:bg-dark-card transition-colors ${
+                    isClickable ? 'cursor-pointer' : ''
+                  }`}
                 >
                   <div className="mt-0.5">{getActivityIcon()}</div>
                   <div className="flex-1">
@@ -353,6 +402,7 @@ const Dashboard = () => {
                     )}
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {formatRelativeTime(activity.createdAt)}
+                      {isClickable && <span className="ml-2 text-blue-600 dark:text-blue-400">• Click to view</span>}
                     </p>
                   </div>
                 </div>

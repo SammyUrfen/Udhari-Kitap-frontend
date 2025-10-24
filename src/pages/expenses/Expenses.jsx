@@ -44,6 +44,7 @@ const Expenses = () => {
   const [editingExpense, setEditingExpense] = useState(null)
   const [filterFriend, setFilterFriend] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
+  const [showTransactions, setShowTransactions] = useState(true) // Default to showing transactions
   const [expandedExpense, setExpandedExpense] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreExpenses, setHasMoreExpenses] = useState(true)
@@ -76,6 +77,14 @@ const Expenses = () => {
     }
     if (expandParam) {
       setExpandedExpense(expandParam)
+      
+      // Scroll to the expanded item after a short delay to ensure it's rendered
+      setTimeout(() => {
+        const element = document.getElementById(`expense-${expandParam}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 300)
     }
   }, [searchParams])
 
@@ -95,7 +104,7 @@ const Expenses = () => {
 
   useEffect(() => {
     fetchData()
-  }, [filterFriend, showDeleted])
+  }, [filterFriend, showDeleted, showTransactions])
 
   const fetchData = async (reset = true) => {
     try {
@@ -112,6 +121,7 @@ const Expenses = () => {
         page: reset ? 1 : expensesPage
       }
       if (showDeleted) params.includeDeleted = true
+      if (showTransactions) params.includeTransactions = true
 
       const expensesData = await expensesService.getExpenses(params)
       
@@ -140,6 +150,7 @@ const Expenses = () => {
         page: nextPage
       }
       if (showDeleted) params.includeDeleted = true
+      if (showTransactions) params.includeTransactions = true
 
       const expensesData = await expensesService.getExpenses(params)
       const newExpenses = expensesData.expenses || []
@@ -162,12 +173,21 @@ const Expenses = () => {
   const filteredExpenses = useMemo(() => {
     if (!filterFriend) return expenses
     
-    // Filter expenses where the friend is a participant
-    return expenses.filter(expense => 
-      expense.participants?.some(p => 
-        p.user?._id === filterFriend || p.user?.id === filterFriend
-      )
-    )
+    // Filter expenses and transactions where the friend is involved
+    return expenses.filter(item => {
+      if (item.type === 'transaction') {
+        // For transactions, check if the friend is either 'from' or 'to'
+        return item.from?._id === filterFriend || 
+               item.from?.id === filterFriend ||
+               item.to?._id === filterFriend || 
+               item.to?.id === filterFriend
+      } else {
+        // For expenses, check if the friend is a participant
+        return item.participants?.some(p => 
+          p.user?._id === filterFriend || p.user?.id === filterFriend
+        )
+      }
+    })
   }, [expenses, filterFriend])
 
   // Get filtered friend info to display
@@ -693,6 +713,16 @@ const Expenses = () => {
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">Show deleted</span>
           </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showTransactions}
+              onChange={(e) => setShowTransactions(e.target.checked)}
+              className="rounded border-gray-300 dark:border-dark-border text-primary-600 dark:text-dark-accent focus:ring-primary-500 dark:focus:ring-dark-accent"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Show settlements</span>
+          </label>
         </div>
       </div>
 
@@ -761,19 +791,33 @@ const Expenses = () => {
             {filteredExpenses.map((expense) => {
               const expenseId = expense.id || expense._id
               const isExpanded = expandedExpense === expenseId
-              const isPayer = expense.payer?._id === currentUserId || expense.payer?.id === currentUserId
-              const userParticipant = expense.participants?.find(p => 
+              const isTransaction = expense.type === 'transaction'
+              const isPayer = !isTransaction && (expense.payer?._id === currentUserId || expense.payer?.id === currentUserId)
+              const userParticipant = !isTransaction && expense.participants?.find(p => 
                 p.user?._id === currentUserId || p.user?.id === currentUserId
               )
-              const userShare = userParticipant?.shareInRupees || 0
-              const userBalance = isPayer 
-                ? (expense.amountInRupees || expense.amount) - userShare
-                : -userShare
+              const userShare = !isTransaction ? (userParticipant?.shareInRupees || 0) : 0
+              const userBalance = !isTransaction 
+                ? (isPayer 
+                  ? (expense.amountInRupees || expense.amount) - userShare
+                  : -userShare)
+                : 0
+              
+              // Get icon based on type
+              const getItemIcon = () => {
+                if (isTransaction) {
+                  return <DollarSign size={24} className="text-green-500 dark:text-green-400" />
+                } else if (expense.isDeleted) {
+                  return <Trash2 size={24} className="text-red-500 dark:text-red-400" />
+                } else {
+                  return <Receipt size={24} className="text-blue-500 dark:text-blue-400" />
+                }
+              }
               
               // Calculate balance with filtered friend if filter is active
               let friendBalance = null
               let friendName = null
-              if (filterFriend) {
+              if (filterFriend && !isTransaction) {
                 const filteredFriendParticipant = expense.participants?.find(p => 
                   p.user?._id === filterFriend || p.user?.id === filterFriend
                 )
@@ -790,14 +834,32 @@ const Expenses = () => {
                     friendBalance = -userShare
                   }
                 }
+              } else if (filterFriend && isTransaction) {
+                // For transactions, calculate balance based on direction
+                if (expense.from?._id === currentUserId || expense.from?.id === currentUserId) {
+                  friendName = expense.to?.name
+                  friendBalance = -(expense.amountInRupees || 0) // You paid them (you gave money)
+                } else {
+                  friendName = expense.from?.name
+                  friendBalance = expense.amountInRupees || 0 // They paid you (you received money)
+                }
               }
               
               return (
-                <div key={expenseId} className={expense.isDeleted ? 'opacity-50' : ''}>
+                <div 
+                  key={expenseId} 
+                  id={`expense-${expenseId}`}
+                  className={expense.isDeleted ? 'opacity-50' : ''}
+                >
                   <div
                     onClick={() => setExpandedExpense(isExpanded ? null : expenseId)}
-                    className="flex items-center justify-between py-4 hover:bg-gray-50 dark:hover:bg-dark-bg px-4 rounded-lg cursor-pointer"
+                    className="flex items-center gap-4 justify-between py-4 hover:bg-gray-50 dark:hover:bg-dark-bg px-4 rounded-lg cursor-pointer"
                   >
+                    {/* Icon */}
+                    <div className="flex-shrink-0">
+                      {getItemIcon()}
+                    </div>
+
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-gray-900 dark:text-dark-text">
@@ -808,10 +870,22 @@ const Expenses = () => {
                             Deleted
                           </span>
                         )}
+                        {isTransaction && (
+                          <span className="px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded">
+                            Settlement
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         {formatDate(expense.date || expense.createdAt)}
-                        {expense.participants && ` • ${expense.participants.length} ${expense.participants.length === 1 ? 'person' : 'people'}`}
+                        {!isTransaction && expense.participants && ` • ${expense.participants.length} ${expense.participants.length === 1 ? 'person' : 'people'}`}
+                        {isTransaction && (
+                          <span>
+                            {expense.direction === 'sent' 
+                              ? ` • You paid ${expense.to?.name || 'someone'}` 
+                              : ` • ${expense.from?.name || 'Someone'} paid you`}
+                          </span>
+                        )}
                       </p>
                       
                       {/* Show friend balance if filtering by friend */}
@@ -826,7 +900,7 @@ const Expenses = () => {
                             : `You owe ${friendName || 'friend'}: ${formatCurrency(Math.abs(friendBalance))}`
                           }
                         </p>
-                      ) : (
+                      ) : !isTransaction ? (
                         /* Show user's share with color coding when not filtering */
                         <p className={`text-sm font-medium mt-1 ${
                           userBalance > 0 
@@ -843,7 +917,7 @@ const Expenses = () => {
                             </span>
                           )}
                         </p>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -851,12 +925,14 @@ const Expenses = () => {
                         <p className="text-xl font-bold text-gray-900 dark:text-dark-text">
                           {formatCurrency(expense.amountInRupees || expense.amount)}
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {expense.splitMethod || 'equal'} split
-                        </p>
+                        {!isTransaction && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {expense.splitMethod || 'equal'} split
+                          </p>
+                        )}
                       </div>
 
-                      {!expense.isDeleted && (
+                      {!expense.isDeleted && !isTransaction && (
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => openEditModal(expense)}
@@ -900,7 +976,7 @@ const Expenses = () => {
                   </div>
                   
                   {/* Expanded Details */}
-                  {isExpanded && (
+                  {isExpanded && !isTransaction && (
                     <div className="px-4 pb-4 bg-gray-50 dark:bg-dark-bg/50">
                       <div className="border-t border-gray-200 dark:border-dark-border pt-4 space-y-3">
                         {/* Paid By */}
@@ -947,6 +1023,59 @@ const Expenses = () => {
                               <>You owe {formatCurrency(Math.abs(userBalance))}</>
                             ) : (
                               <>Settled</>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Expanded Details for Transactions */}
+                  {isExpanded && isTransaction && (
+                    <div className="px-4 pb-4 bg-gray-50 dark:bg-dark-bg/50">
+                      <div className="border-t border-gray-200 dark:border-dark-border pt-4 space-y-3">
+                        {/* Transaction Details */}
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">From:</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                            {expense.from?.name || 'Unknown'}
+                            {(expense.from?._id === currentUserId || expense.from?.id === currentUserId) && ' (You)'}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">To:</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                            {expense.to?.name || 'Unknown'}
+                            {(expense.to?._id === currentUserId || expense.to?.id === currentUserId) && ' (You)'}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                            {formatCurrency(expense.amountInRupees || expense.amount)}
+                          </span>
+                        </div>
+                        
+                        {expense.note && (
+                          <div className="pt-2 border-t border-gray-200 dark:border-dark-border">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Note:</p>
+                            <p className="text-sm text-gray-900 dark:text-dark-text mt-1">{expense.note}</p>
+                          </div>
+                        )}
+                        
+                        {/* Settlement Summary */}
+                        <div className="pt-2 border-t border-gray-200 dark:border-dark-border">
+                          <div className={`text-sm font-medium ${
+                            expense.direction === 'sent'
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-green-600 dark:text-green-400'
+                          }`}>
+                            {expense.direction === 'sent' ? (
+                              <>You paid {formatCurrency(expense.amountInRupees || expense.amount)}</>
+                            ) : (
+                              <>You received {formatCurrency(expense.amountInRupees || expense.amount)}</>
                             )}
                           </div>
                         </div>
