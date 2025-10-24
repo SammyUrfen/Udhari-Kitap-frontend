@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { getErrorMessage } from '../../utils/errorHandler'
 import { toast } from 'react-toastify'
 import { Sun, Moon } from 'lucide-react'
 
@@ -25,7 +26,11 @@ const Login = () => {
       toast.success('Login successful!')
       navigate('/dashboard')
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed')
+      const errorMsg = getErrorMessage(error, 'Login failed')
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     } finally {
       setIsLoading(false)
     }

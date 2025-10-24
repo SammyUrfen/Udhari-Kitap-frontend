@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { friendsService } from '../../services/friends'
 import { transactionsService } from '../../services/transactions'
 import { formatCurrency, getBalanceText, getBalanceColor } from '../../utils/currency'
+import { getErrorMessage } from '../../utils/errorHandler'
 import { toast } from 'react-toastify'
 import { Users, Search, UserPlus, Edit2, Trash2, X, DollarSign } from 'lucide-react'
 
@@ -73,7 +74,11 @@ const Friends = () => {
       setSearchResults([])
       fetchFriends()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add friend')
+      const errorMsg = getErrorMessage(error, 'Failed to add friend')
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     }
   }
 

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../services/api'
+import { getErrorMessage } from '../../utils/errorHandler'
 import { toast } from 'react-toastify'
 import { User, Camera, Mail, Calendar } from 'lucide-react'
 import { formatDate } from '../../utils/date'
@@ -45,7 +46,11 @@ const Profile = () => {
       toast.success('Profile picture updated successfully!')
     } catch (error) {
       console.error('Profile picture upload error:', error)
-      toast.error(error.response?.data?.message || 'Failed to upload profile picture')
+      const errorMsg = getErrorMessage(error, 'Failed to upload profile picture')
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     } finally {
       setUploading(false)
     }

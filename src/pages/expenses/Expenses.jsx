@@ -6,6 +6,7 @@ import { friendsService } from '../../services/friends'
 import { balancesService } from '../../services/balances'
 import { formatCurrency } from '../../utils/currency'
 import { formatDate } from '../../utils/date'
+import { getErrorMessage } from '../../utils/errorHandler'
 import {
   calculateEqualSplit,
   validateSplitSum,
@@ -465,7 +466,11 @@ const Expenses = () => {
       await fetchData()
     } catch (error) {
       const action = editingExpense ? 'update' : 'create'
-      toast.error(error.response?.data?.message || `Failed to ${action} expense`)
+      const errorMsg = getErrorMessage(error, `Failed to ${action} expense`)
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     }
   }
 
@@ -536,7 +541,11 @@ const Expenses = () => {
       await fetchData()
       toast.success('Expense deleted successfully')
     } catch (error) {
-      toast.error('Failed to delete expense')
+      const errorMsg = getErrorMessage(error, 'Failed to delete expense')
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     }
   }
 
@@ -546,7 +555,11 @@ const Expenses = () => {
       await fetchData()
       toast.success('Expense restored successfully')
     } catch (error) {
-      toast.error('Failed to restore expense')
+      const errorMsg = getErrorMessage(error, 'Failed to restore expense')
+      toast.error(errorMsg, {
+        autoClose: 8000,
+        style: { whiteSpace: 'pre-line' }
+      })
     }
   }
 
